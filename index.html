@@ -1,0 +1,1722 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>⚡ 智能订单 & 备货系统（财务版）</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        /* ===== CSS Reset & Base ===== */
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+        :root {
+            --bg-deep: #080c18;
+            --bg-card: rgba(10, 20, 40, 0.5);
+            --border-subtle: rgba(0, 180, 255, 0.06);
+            --border-medium: rgba(0, 180, 255, 0.12);
+            --text-primary: #e8edf5;
+            --text-secondary: #c8d8e8;
+            --text-muted: #6a9aba;
+            --text-dim: #3a5a7a;
+            --accent-blue: #0066ff;
+            --accent-cyan: #00d4ff;
+            --accent-gold: #fbbf24;
+            --accent-green: #00b86b;
+            --accent-purple: #8b5cf6;
+            --accent-red: #ff6b6b;
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 20px;
+            --radius-xl: 40px;
+            --transition-fast: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-smooth: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg-deep);
+            min-height: 100vh;
+            padding: 20px 28px;
+            color: var(--text-primary);
+            display: flex;
+            justify-content: center;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* ===== Animated Background ===== */
+        body::before {
+            content: '';
+            position: fixed; top: -50%; left: -50%; width: 200%; height: 200%;
+            background:
+                radial-gradient(ellipse at 20% 50%, rgba(0, 100, 255, 0.06) 0%, transparent 60%),
+                radial-gradient(ellipse at 80% 20%, rgba(0, 200, 255, 0.04) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 80%, rgba(100, 0, 255, 0.03) 0%, transparent 40%);
+            z-index: 0; pointer-events: none;
+        }
+        @media (prefers-reduced-motion: no-preference) {
+            body::before { animation: bgPulse 15s ease-in-out infinite alternate; }
+        }
+        @keyframes bgPulse { 0% { transform: scale(1) rotate(0deg); } 100% { transform: scale(1.1) rotate(3deg); } }
+
+        body::after {
+            content: '';
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background-image:
+                linear-gradient(rgba(0, 180, 255, 0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 180, 255, 0.02) 1px, transparent 1px);
+            background-size: 60px 60px;
+            z-index: 0; pointer-events: none;
+        }
+
+        .app { max-width: 1600px; width: 100%; position: relative; z-index: 1; }
+
+        /* ===== Scrollbar ===== */
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.15); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: rgba(0, 180, 255, 0.12); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(0, 180, 255, 0.22); }
+
+        /* ===== Section Divider ===== */
+        .section-divider {
+            margin: 40px 0 25px 0;
+            border: 0;
+            border-top: 1px solid rgba(0, 180, 255, 0.08);
+            position: relative;
+        }
+        .section-divider::after {
+            content: '⬇ 下方区域：多平台订单统一筛选导出 ⬇';
+            position: absolute; top: -10px; left: 50%; transform: translateX(-50%);
+            background: var(--bg-deep); padding: 0 20px;
+            font-size: 0.75rem; color: #4a7a9a; letter-spacing: 1px; white-space: nowrap;
+        }
+
+        /* ===== Buttons ===== */
+        .btn {
+            padding: 10px 26px; border-radius: var(--radius-xl); font-weight: 600; font-size: 0.85rem;
+            border: none; cursor: pointer; transition: var(--transition-smooth);
+            display: inline-flex; align-items: center; gap: 8px; font-family: inherit;
+            letter-spacing: 0.2px; position: relative; overflow: hidden;
+            white-space: nowrap;
+        }
+        .btn:disabled { opacity: 0.25; pointer-events: none; filter: grayscale(0.4); }
+        .btn::after {
+            content: ''; position: absolute; inset: 0;
+            background: linear-gradient(135deg, rgba(255,255,255,0.05), transparent);
+            pointer-events: none;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #0066ff, #0047b3);
+            color: #fff; border: 1px solid rgba(0, 150, 255, 0.15);
+            box-shadow: 0 4px 30px rgba(0, 80, 255, 0.12);
+        }
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px) scale(1.02);
+            box-shadow: 0 8px 40px rgba(0, 80, 255, 0.25);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #00b86b, #008a4e);
+            color: #fff; border: 1px solid rgba(0, 220, 120, 0.1);
+            box-shadow: 0 4px 30px rgba(0, 200, 100, 0.08);
+        }
+        .btn-success:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 40px rgba(0, 200, 100, 0.15);
+        }
+
+        .btn-outline {
+            background: rgba(0, 40, 80, 0.2); border: 1px solid rgba(0, 180, 255, 0.08);
+            color: #8ab8e0; backdrop-filter: blur(4px);
+        }
+        .btn-outline:hover:not(:disabled) {
+            background: rgba(0, 40, 80, 0.4); border-color: rgba(0, 180, 255, 0.18);
+            transform: translateY(-2px);
+        }
+
+        .btn-gold {
+            background: linear-gradient(135deg, #fbbf24, #f59e0b);
+            color: #080c18; border: 1px solid rgba(251, 191, 36, 0.2);
+            box-shadow: 0 4px 30px rgba(251, 191, 36, 0.12);
+        }
+        .btn-gold:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 40px rgba(251, 191, 36, 0.25);
+        }
+
+        .btn-regen {
+            background: rgba(0, 40, 80, 0.3); border: 1px solid rgba(0, 180, 255, 0.12);
+            color: #8ab8e0; font-size: 0.78rem; padding: 8px 18px;
+        }
+        .btn-regen:hover:not(:disabled) {
+            background: rgba(0, 60, 120, 0.4); border-color: rgba(0, 180, 255, 0.25);
+            transform: translateY(-1px);
+        }
+
+        /* ===== Library Status ===== */
+        .lib-status {
+            font-size: 0.75rem; color: #3a6a8a; margin-left: auto;
+            display: flex; align-items: center; gap: 8px;
+            padding: 4px 14px; background: rgba(0, 40, 80, 0.15);
+            border-radius: 30px; border: 1px solid rgba(0, 180, 255, 0.04);
+        }
+        .lib-status .ok { color: #5ddfa0; }
+        .lib-status .loading { color: #f0c060; animation: spin 1.5s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* ===== Toast Notifications ===== */
+        .toast-container {
+            position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+            display: flex; flex-direction: column; gap: 8px; pointer-events: none;
+        }
+        .toast {
+            pointer-events: auto; padding: 12px 20px; border-radius: var(--radius-md);
+            font-size: 0.82rem; font-weight: 500; backdrop-filter: blur(20px);
+            border: 1px solid; display: flex; align-items: center; gap: 10px;
+            max-width: 460px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            animation: toastIn 0.35s ease, toastOut 0.3s ease 3.5s forwards;
+        }
+        .toast-success { background: rgba(0, 200, 100, 0.12); border-color: rgba(0, 200, 100, 0.18); color: #7ddfb0; }
+        .toast-error   { background: rgba(255, 60, 60, 0.12); border-color: rgba(255, 60, 60, 0.18); color: #f08080; }
+        .toast-warning { background: rgba(251, 191, 36, 0.12); border-color: rgba(251, 191, 36, 0.18); color: #fbbf24; }
+        .toast-info    { background: rgba(0, 150, 255, 0.12); border-color: rgba(0, 150, 255, 0.18); color: #7abfff; }
+        @keyframes toastIn  { from { transform: translateX(120%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes toastOut { from { opacity: 1; } to { opacity: 0; transform: translateY(-10px); } }
+
+        /* ===== Table Styles ===== */
+        .table-scroll {
+            overflow-x: auto; padding: 0 2px 2px 2px;
+            position: relative;
+        }
+        .table-scroll::after {
+            content: ''; position: absolute; right: 0; top: 0; bottom: 0; width: 28px;
+            background: linear-gradient(to left, rgba(8, 12, 24, 0.7), transparent);
+            pointer-events: none; opacity: 0; transition: opacity 0.3s;
+            border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+        }
+        .table-scroll.scrollable-right::after { opacity: 1; }
+
+        table { border-collapse: collapse; width: 100%; font-size: 0.82rem; min-width: 400px; }
+        th {
+            background: rgba(0, 40, 80, 0.12); color: #6a9aba; font-weight: 500;
+            padding: 12px 16px; border-bottom: 1px solid rgba(0, 180, 255, 0.04);
+            text-align: left; font-size: 0.65rem; text-transform: uppercase;
+            letter-spacing: 0.8px; white-space: nowrap; position: sticky; top: 0; z-index: 1;
+        }
+        td {
+            padding: 10px 16px; border-bottom: 1px solid rgba(255, 255, 255, 0.015);
+            color: var(--text-secondary); vertical-align: middle;
+        }
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: rgba(0, 100, 200, 0.03); transition: background var(--transition-fast); }
+
+        /* ===== Empty States ===== */
+        .empty-state { padding: 40px 20px; text-align: center; color: var(--text-dim); font-size: 0.85rem; }
+        .empty-icon { font-size: 2rem; display: block; margin-bottom: 8px; opacity: 0.3; }
+        .empty-title { font-size: 0.95rem; color: #5a7a9a; margin-bottom: 4px; font-weight: 500; }
+        .empty-hint { font-size: 0.75rem; color: var(--text-dim); }
+
+        /* ===== Spinner / Loading ===== */
+        .spinner {
+            display: inline-block; width: 16px; height: 16px;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-top-color: #7abfff; border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+        .loading-overlay {
+            display: flex; align-items: center; gap: 10px; padding: 20px;
+            justify-content: center; color: #7abfff; font-size: 0.82rem;
+            background: rgba(0, 0, 0, 0.2); border-radius: var(--radius-sm);
+        }
+
+        /* ===== Drag & Drop ===== */
+        .upload-zone { position: relative; transition: border-color var(--transition-fast), background var(--transition-fast); }
+        .upload-zone.drag-over {
+            border-color: rgba(0, 180, 255, 0.5) !important;
+            background: rgba(0, 100, 255, 0.08) !important;
+        }
+        .upload-zone.drag-over::after {
+            content: '📂 释放文件以上传';
+            position: absolute; inset: 0; display: flex; align-items: center;
+            justify-content: center; font-size: 0.9rem; font-weight: 600;
+            color: #7abfff; background: rgba(0, 20, 50, 0.85);
+            border-radius: inherit; z-index: 2; pointer-events: none;
+        }
+
+        /* ===== File Info Display ===== */
+        .file-info { display: flex; align-items: center; gap: 8px; font-size: 0.75rem; }
+        .file-info .file-name { color: #b8d0e8; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .file-info .file-size { color: #4a6a7a; font-size: 0.65rem; white-space: nowrap; }
+
+        /* ===== Module 1: Dual Stock System ===== */
+        .module1-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+
+        .module1-card {
+            background: var(--bg-card); backdrop-filter: blur(20px);
+            border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
+            padding: 22px 26px;
+            transition: transform var(--transition-smooth), box-shadow var(--transition-smooth), border-color var(--transition-smooth);
+        }
+        .module1-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 48px rgba(0, 0, 0, 0.35);
+            border-color: rgba(0, 150, 255, 0.1);
+        }
+
+        .module1-card-title {
+            font-size: 0.9rem; font-weight: 600; margin-bottom: 16px;
+            display: flex; align-items: center; gap: 8px;
+            border-bottom: 1px solid var(--border-subtle); padding-bottom: 12px;
+        }
+        .m1-new .module1-card-title { color: #8ac4ff; }
+        .m1-old .module1-card-title { color: #ff9090; }
+
+        .m1-upload-item { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+        .m1-upload-item label {
+            font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1.2px;
+            color: #5a8aaa; font-weight: 600; display: flex; align-items: center; gap: 10px;
+        }
+        .label-tag {
+            font-size: 0.55rem; background: rgba(0, 180, 255, 0.06);
+            padding: 2px 10px; border-radius: 30px; color: #4a8aaa;
+            border: 1px solid rgba(0, 180, 255, 0.06);
+        }
+
+        .m1-file-wrap {
+            display: flex; align-items: center;
+            background: rgba(0, 10, 30, 0.5); border: 1px solid rgba(0, 180, 255, 0.08);
+            border-radius: var(--radius-md); padding: 2px 2px 2px 16px;
+            transition: all var(--transition-smooth);
+        }
+        .m1-file-wrap:hover { border-color: rgba(0, 180, 255, 0.22); }
+        .m1-file-wrap input[type="file"] {
+            flex: 1; background: transparent; border: none; padding: 12px 0;
+            color: #b8d0e8; font-size: 0.85rem; cursor: pointer; min-width: 0; font-family: inherit;
+        }
+        .m1-file-wrap input[type="file"]::file-selector-button {
+            background: rgba(0, 100, 255, 0.06); border: 1px solid rgba(0, 180, 255, 0.1);
+            border-radius: 30px; padding: 6px 20px; margin-right: 14px;
+            color: #8ac4ff; font-weight: 500; font-size: 0.75rem;
+            transition: all 0.25s; cursor: pointer;
+        }
+        .m1-file-wrap input[type="file"]::file-selector-button:hover {
+            background: rgba(0, 100, 255, 0.14); border-color: rgba(0, 180, 255, 0.25);
+        }
+
+        .m1-file-status {
+            font-size: 0.7rem; padding: 3px 14px; border-radius: 30px;
+            background: rgba(0, 200, 100, 0.05); border: 1px solid rgba(0, 200, 100, 0.08);
+            color: #5ddfa0; white-space: nowrap; font-weight: 500;
+        }
+        .m1-file-status.empty {
+            color: var(--text-dim); background: rgba(255, 255, 255, 0.01);
+            border-color: rgba(255, 255, 255, 0.03);
+        }
+
+        /* ===== File Clear Button ===== */
+        .file-clear {
+            background: none; border: none; color: #4a5a6a; font-size: 1rem;
+            cursor: pointer; padding: 2px 8px; border-radius: 50%; line-height: 1;
+            transition: all var(--transition-fast); flex-shrink: 0; display: none;
+            font-family: inherit;
+        }
+        .m1-file-wrap:hover .file-clear,
+        .c-upload-area:hover .file-clear { display: inline-block; }
+        .file-clear:hover { color: #f08080; background: rgba(255, 60, 60, 0.12); }
+        .file-clear.show { display: inline-block; }
+
+        .m1-actions {
+            display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+            margin-top: 15px; border-top: 1px solid rgba(0, 180, 255, 0.05); padding-top: 15px;
+        }
+
+        .m1-status {
+            padding: 10px 16px; border-radius: var(--radius-md); font-weight: 500;
+            margin: 10px 0 0 0; display: none; font-size: 0.8rem; border: 1px solid transparent;
+            background: rgba(10, 20, 40, 0.3);
+        }
+        .m1-status.success { border-color: rgba(0, 200, 100, 0.12); color: #7ddfb0; display: block; background: rgba(0, 200, 100, 0.03); }
+        .m1-status.error   { border-color: rgba(255, 60, 60, 0.12); color: #f08080; display: block; background: rgba(255, 60, 60, 0.03); }
+        .m1-status.info    { border-color: rgba(0, 150, 255, 0.12); color: #7abfff; display: block; background: rgba(0, 150, 255, 0.03); }
+
+        /* Editable Price Cell */
+        .editable-price {
+            background: rgba(0, 0, 0, 0.25); padding: 4px 8px; border-radius: 4px;
+            border: 1px solid rgba(0, 180, 255, 0.1); width: 100%; color: #f0f8ff;
+            text-align: center; outline: none; cursor: text; min-width: 60px;
+            transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+        }
+        .editable-price:focus {
+            border-color: rgba(0, 180, 255, 0.4);
+            box-shadow: 0 0 0 2px rgba(0, 180, 255, 0.1);
+        }
+
+        /* ===== Module 1: Global Merge ===== */
+        .m1-global-actions {
+            display: flex; justify-content: center; margin-bottom: 30px;
+            padding: 20px; background: rgba(251, 191, 36, 0.04);
+            border: 1px solid rgba(251, 191, 36, 0.1); border-radius: var(--radius-xl);
+        }
+        .m1-global-label { color: var(--accent-gold); font-weight: 600; margin-right: 20px; display: flex; align-items: center; gap: 8px; }
+
+        /* ===== Module 2: Order Platform Cards ===== */
+        .module2-wrapper { width: 100%; overflow-x: auto; padding-bottom: 10px; }
+
+        .module2-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px; min-width: 800px;
+        }
+
+        .m2-card {
+            background: var(--bg-card); backdrop-filter: blur(16px);
+            border: 1px solid rgba(0, 180, 255, 0.05); border-radius: var(--radius-lg);
+            padding: 20px; box-shadow: 0 8px 48px rgba(0, 0, 0, 0.3);
+            display: flex; flex-direction: column; height: 100%;
+            transition: transform var(--transition-smooth), box-shadow var(--transition-smooth), border-color var(--transition-smooth);
+        }
+        .m2-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 14px 52px rgba(0, 0, 0, 0.4);
+            border-color: rgba(139, 92, 246, 0.12);
+        }
+
+        .m2-card .c-title {
+            font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px;
+            border-bottom: 1px solid rgba(42, 58, 74, 0.6); padding-bottom: 12px; margin-bottom: 8px;
+        }
+
+        .m2-card .c-upload {
+            background: rgba(0, 10, 30, 0.5); border: 1px dashed rgba(0, 180, 255, 0.1);
+            border-radius: var(--radius-md); padding: 14px 12px; text-align: center;
+            cursor: pointer; transition: var(--transition-fast);
+        }
+        .m2-card .c-upload:hover { border-color: rgba(0, 180, 255, 0.25); background: rgba(0, 10, 30, 0.6); }
+        .m2-card .c-upload input { display: none; }
+
+        .m2-filter {
+            display: flex; gap: 8px; margin: 8px 0;
+        }
+        .m2-filter select, .m2-filter input {
+            flex: 1; background: rgba(0, 10, 30, 0.5);
+            border: 1px solid rgba(0, 180, 255, 0.1); color: #c8d8e8;
+            padding: 7px 10px; border-radius: 6px; outline: none; font-size: 13px;
+            font-family: inherit; transition: border-color var(--transition-fast);
+        }
+        .m2-filter select:focus, .m2-filter input:focus {
+            border-color: rgba(0, 180, 255, 0.3);
+        }
+        .m2-filter select {
+            appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236a9aba'/%3E%3C/svg%3E");
+            background-repeat: no-repeat; background-position: right 10px center; padding-right: 28px;
+        }
+
+        .m2-tip {
+            font-size: 11px; color: var(--accent-gold);
+            background: rgba(251, 191, 36, 0.06); border: 1px solid rgba(251, 191, 36, 0.1);
+            border-radius: 6px; padding: 5px 10px; margin-bottom: 4px;
+        }
+
+        .m2-down-btn {
+            width: 100%; padding: 9px 0; margin-top: auto;
+            background: rgba(0, 200, 100, 0.08); color: #5ddfa0;
+            border: 1px solid rgba(0, 200, 100, 0.1); border-radius: 6px;
+            cursor: pointer; transition: var(--transition-fast); font-family: inherit;
+            font-weight: 500; font-size: 0.82rem;
+        }
+        .m2-down-btn:hover:not(:disabled) {
+            background: rgba(0, 200, 100, 0.18); border-color: rgba(0, 200, 100, 0.25);
+        }
+        .m2-down-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+        /* ===== Summary Block ===== */
+        .summary-block {
+            margin-top: 25px; border-top: 1px solid rgba(139, 92, 246, 0.12); padding-top: 25px;
+            display: block !important;
+        }
+        .summary-card {
+            background: var(--bg-card); backdrop-filter: blur(16px);
+            border: 1px solid rgba(139, 92, 246, 0.18); border-radius: var(--radius-lg);
+            padding: 20px; box-shadow: 0 8px 48px rgba(139, 92, 246, 0.06);
+            transition: transform var(--transition-smooth), box-shadow var(--transition-smooth);
+        }
+        .summary-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 56px rgba(139, 92, 246, 0.1);
+        }
+        .summary-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 15px; flex-wrap: wrap; gap: 10px;
+        }
+        .summary-title {
+            font-size: 16px; font-weight: 600; color: #a78bfa;
+            display: flex; align-items: center; gap: 10px;
+        }
+        .summary-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+        .summary-btn {
+            padding: 8px 20px; border-radius: 30px; border: none; font-weight: 600;
+            font-size: 0.8rem; cursor: pointer; transition: var(--transition-fast); font-family: inherit;
+        }
+        .summary-btn.full {
+            background: var(--accent-purple); color: #fff;
+        }
+        .summary-btn.full:hover:not(:disabled) { background: #7c3aed; transform: translateY(-1px); }
+        .summary-btn.top3 {
+            background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.2);
+            color: #7abfff;
+        }
+        .summary-btn.top3:hover:not(:disabled) { background: rgba(59, 130, 246, 0.2); transform: translateY(-1px); }
+        .summary-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+        /* ===== Responsive ===== */
+        @media (max-width: 1400px) {
+            .module1-grid { gap: 16px; }
+            .module2-grid { gap: 12px; }
+        }
+        @media (max-width: 1200px) {
+            .module2-grid { grid-template-columns: repeat(3, 1fr); }
+        }
+        @media (max-width: 960px) {
+            .module2-grid { grid-template-columns: repeat(2, 1fr); }
+            .module1-grid { gap: 14px; }
+        }
+        @media (max-width: 700px) {
+            .module1-grid, .module2-grid { grid-template-columns: 1fr; }
+            body { padding: 12px 14px; }
+            .btn, .summary-actions, .m1-global-actions {
+                justify-content: center; width: 100%;
+                flex-direction: column; align-items: stretch; border-radius: var(--radius-md);
+            }
+            .m1-global-label { margin-right: 0; justify-content: center; }
+            .header { flex-direction: column; gap: 12px; text-align: center; }
+            .header > div:first-child { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+    <div class="app">
+
+        <!-- ===== Header ===== -->
+        <header class="header" style="display:flex; align-items:center; justify-content:space-between; padding: 20px 0 24px 0; border-bottom:1px solid rgba(0,180,255,0.08); margin-bottom:28px;">
+            <div style="display:flex; align-items:center; gap:16px;">
+                <span style="font-size:2rem; filter:drop-shadow(0 0 20px rgba(0,100,255,0.3));">⚡</span>
+                <div>
+                    <h1 style="font-weight:700; font-size:1.6rem; background:linear-gradient(135deg,#f0f8ff 0%,#7abfff 50%,#4a7fff 100%); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">智能备货与订单系统（财务版）</h1>
+                </div>
+            </div>
+            <div style="display:flex; align-items:center; gap:12px; background:rgba(0,40,80,0.3); border:1px solid rgba(0,180,255,0.08); padding:6px 18px 6px 14px; border-radius:40px; backdrop-filter:blur(10px);">
+                <span style="width:8px; height:8px; background:#00d4ff; border-radius:50%; box-shadow:0 0 16px #00d4ff66;"></span>
+                <span style="font-size:0.75rem; color:#8ac4ff; font-weight:500;">新款 & 旧款 独立分流</span>
+            </div>
+            <span class="lib-status" id="libStatus"><span class="ok">●</span> XLSX 就绪</span>
+        </header>
+
+        <!-- ===== Module 1: Dual Stock System ===== -->
+        <div class="module1-grid">
+            <!-- New Products -->
+            <div class="module1-card m1-new" id="moduleNew">
+                <div class="module1-card-title"><span style="color:#00d4ff;">●</span> 新款备货系统 (匹配备注含 "新")</div>
+                <div class="m1-upload-item">
+                    <label><span>📋</span> SKU 物料映射 <span class="label-tag">新款</span></label>
+                    <div class="m1-file-wrap upload-zone" id="mappingZoneNew">
+                        <input type="file" id="mappingFileNew" accept=".xlsx,.xls" />
+                        <span id="mappingInfoNew" class="m1-file-status empty">未上传</span>
+                        <button class="file-clear" onclick="clearMapping('New')" title="清除映射表">✕</button>
+                    </div>
+                </div>
+                <div class="m1-upload-item">
+                    <label><span>🧾</span> 订单数据（自动汇入） <span class="label-tag">新款</span></label>
+                    <div class="m1-file-wrap upload-zone" id="orderZoneNew" style="opacity:0.7;">
+                        <input type="file" id="orderFileNew" accept=".xlsx,.xls" />
+                        <span id="orderInfoNew" class="m1-file-status empty">等待汇总数据汇入...</span>
+                        <button class="file-clear" onclick="clearOrderData('New')" title="清除订单数据">✕</button>
+                    </div>
+                </div>
+                <div class="m1-actions">
+                    <button id="processBtnNew" class="btn btn-primary" disabled onclick="generatePickingList('New')">⚡ 生成新款备货</button>
+                    <button id="regenBtnNew" class="btn btn-regen" disabled onclick="generatePickingList('New')" style="display:none;">🔄 重新生成</button>
+                    <button id="exportBtnNew" class="btn btn-success" disabled onclick="exportToExcel('New')">📥 导出新款全部</button>
+                </div>
+                <div id="m1StatusNew" class="m1-status"></div>
+                <div class="table-scroll" id="pivotTableNew" style="max-height:300px;border:1px solid rgba(0,180,255,0.05);border-radius:8px;background:rgba(0,10,30,0.3);margin-top:10px;">
+                    <div class="empty-state"><span class="empty-icon">📊</span><div class="empty-title">生成新款备货单</div><div class="empty-hint">上传映射表 + 订单数据后自动生成</div></div>
+                </div>
+            </div>
+
+            <!-- Old Products -->
+            <div class="module1-card m1-old" id="moduleOld">
+                <div class="module1-card-title"><span style="color:#ff6b6b;">●</span> 旧款备货系统 (匹配备注含 "旧")</div>
+                <div class="m1-upload-item">
+                    <label><span>📋</span> SKU 物料映射 <span class="label-tag">旧款</span></label>
+                    <div class="m1-file-wrap upload-zone" id="mappingZoneOld">
+                        <input type="file" id="mappingFileOld" accept=".xlsx,.xls" />
+                        <span id="mappingInfoOld" class="m1-file-status empty">未上传</span>
+                        <button class="file-clear" onclick="clearMapping('Old')" title="清除映射表">✕</button>
+                    </div>
+                </div>
+                <div class="m1-upload-item">
+                    <label><span>🧾</span> 订单数据（自动汇入） <span class="label-tag">旧款</span></label>
+                    <div class="m1-file-wrap upload-zone" id="orderZoneOld" style="opacity:0.7;">
+                        <input type="file" id="orderFileOld" accept=".xlsx,.xls" />
+                        <span id="orderInfoOld" class="m1-file-status empty">等待汇总数据汇入...</span>
+                        <button class="file-clear" onclick="clearOrderData('Old')" title="清除订单数据">✕</button>
+                    </div>
+                </div>
+                <div class="m1-actions">
+                    <button id="processBtnOld" class="btn btn-primary" disabled onclick="generatePickingList('Old')">⚡ 生成旧款备货</button>
+                    <button id="regenBtnOld" class="btn btn-regen" disabled onclick="generatePickingList('Old')" style="display:none;">🔄 重新生成</button>
+                    <button id="exportBtnOld" class="btn btn-success" disabled onclick="exportToExcel('Old')">📥 导出旧款全部</button>
+                </div>
+                <div id="m1StatusOld" class="m1-status"></div>
+                <div class="table-scroll" id="pivotTableOld" style="max-height:300px;border:1px solid rgba(0,180,255,0.05);border-radius:8px;background:rgba(0,10,30,0.3);margin-top:10px;">
+                    <div class="empty-state"><span class="empty-icon">📊</span><div class="empty-title">生成旧款备货单</div><div class="empty-hint">上传映射表 + 订单数据后自动生成</div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Global Merge Export -->
+        <div class="m1-global-actions">
+            <span class="m1-global-label">🔗 全局操作</span>
+            <button id="exportMergedBtn" class="btn btn-gold" disabled onclick="exportMergedExcel()">📥 合并导出 (含财务透视表)</button>
+        </div>
+
+        <!-- ===== Section Divider ===== -->
+        <hr class="section-divider" />
+
+        <!-- ===== Module 2: Multi-Platform Orders ===== -->
+        <section>
+            <div class="module2-wrapper">
+                <div class="module2-grid" id="m2Grid"></div>
+            </div>
+
+            <!-- Summary Card -->
+            <div class="summary-block">
+                <div class="summary-card">
+                    <div class="summary-header">
+                        <div class="summary-title">📊 全平台订单统一汇总</div>
+                        <div class="summary-actions">
+                            <span id="summaryCount" style="font-size:0.8rem; color:#6a9aba; margin-right:10px;">共 0 条</span>
+                            <button class="summary-btn full" id="summaryDownloadBtn" onclick="downloadSummary('full')" disabled>⬇ 下载统一汇总数据</button>
+                            <button class="summary-btn top3" id="summaryTop3Btn" onclick="downloadSummary('top3')" disabled>⬇ 下载前三列数据</button>
+                        </div>
+                    </div>
+                    <div class="table-scroll" id="summaryScroll" style="max-height:350px; border:1px solid rgba(139,92,246,0.12); border-radius:10px; background:rgba(0,10,30,0.3);">
+                        <table><thead id="summaryHead"></thead><tbody id="summaryBody"><tr><td class="empty-state"><span class="empty-icon">📋</span><div class="empty-title">暂无汇总数据</div><div class="empty-hint">请上传并筛选任一平台订单数据</div></td></tr></tbody></table>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- ===== JavaScript ===== -->
+    <script>
+        // ==========================================================
+        // XLSX Loading Check
+        // ==========================================================
+        (function checkXLSX() {
+            const statusEl = document.getElementById('libStatus');
+            if (typeof XLSX === 'undefined') {
+                statusEl.innerHTML = '<span class="loading">⟳</span> 加载中...';
+                const s = document.createElement('script');
+                s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+                s.onload = function() { statusEl.innerHTML = '<span class="ok">●</span> XLSX 就绪'; };
+                s.onerror = function() { statusEl.innerHTML = '❌ 加载失败，请刷新'; };
+                document.head.appendChild(s);
+            }
+        })();
+
+        // ==========================================================
+        // Utilities
+        // ==========================================================
+        function debounce(fn, delay) {
+            delay = delay || 300;
+            let timer = null;
+            return function() {
+                var args = arguments, ctx = this;
+                clearTimeout(timer);
+                timer = setTimeout(function() { fn.apply(ctx, args); }, delay);
+            };
+        }
+
+        function showToast(message, type, duration) {
+            type = type || 'info';
+            duration = duration || 4000;
+            var container = document.getElementById('toastContainer');
+            if (!container) return;
+            var icons = { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️' };
+            var toast = document.createElement('div');
+            toast.className = 'toast toast-' + type;
+            toast.innerHTML = '<span>' + (icons[type] || 'ℹ️') + '</span><span>' + message + '</span>';
+            container.appendChild(toast);
+            setTimeout(function() { if (toast.parentNode) toast.remove(); }, duration);
+        }
+
+        function formatFileSize(bytes) {
+            if (!bytes || bytes < 0) return '';
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / 1048576).toFixed(1) + ' MB';
+        }
+
+        function safeParse(v) { return (v !== undefined && v !== null ? String(v).trim() : '').trim(); }
+        function parseExcelRow(row, start, end) { var res = []; for (var i = start; i <= end; i++) res.push(safeParse(row[i])); return res; }
+        function parseQty(v) { if (v === undefined || v === null) return 1; var str = String(v).trim().replace(/,/g, ''); var num = parseFloat(str); return isNaN(num) ? 1 : Math.max(1, Math.round(num)); }
+
+        function showFileStatus(el, file) {
+            el.innerHTML = '<span class="file-info"><span class="file-name" title="' + file.name + '">' + file.name + '</span><span class="file-size">(' + formatFileSize(file.size) + ')</span></span>';
+            el.className = 'm1-file-status';
+        }
+
+        // ==========================================================
+        // Scroll Indicator
+        // ==========================================================
+        function setupScrollIndicator(container) {
+            if (!container) return;
+            function update() {
+                var scrollable = container.scrollWidth > container.clientWidth + 2;
+                if (scrollable) { container.classList.add('scrollable-right'); }
+                else { container.classList.remove('scrollable-right'); }
+            }
+            container.addEventListener('scroll', update);
+            window.addEventListener('resize', debounce(update, 150));
+            setTimeout(update, 200);
+        }
+
+        // ==========================================================
+        // Drag & Drop Setup
+        // ==========================================================
+        function setupDragDrop(zone, fileInput) {
+            if (!zone || !fileInput) return;
+            ['dragenter', 'dragover'].forEach(function(evt) {
+                zone.addEventListener(evt, function(e) {
+                    e.preventDefault(); e.stopPropagation();
+                    zone.classList.add('drag-over');
+                });
+            });
+            ['dragleave', 'drop'].forEach(function(evt) {
+                zone.addEventListener(evt, function(e) {
+                    e.preventDefault(); e.stopPropagation();
+                    zone.classList.remove('drag-over');
+                });
+            });
+            zone.addEventListener('drop', function(e) {
+                var files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    fileInput.files = files;
+                    fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            });
+        }
+
+        // ==========================================================
+        // Module 1: Dual Stock System
+        // ==========================================================
+        var skuMappings = { New: {}, Old: {} };
+        var orderDatas = { New: [], Old: [] };
+        var pickingResults = {
+            New: { list: [], skuSet: new Set(), pivot: [], totalPrice: 0 },
+            Old: { list: [], skuSet: new Set(), pivot: [], totalPrice: 0 }
+        };
+        var m1AutoGenerated = { New: false, Old: false };
+        var mappingFileNames = { New: '', Old: '' }; // 记录上传的映射表文件名
+
+        ['New', 'Old'].forEach(function(type) {
+            // Mapping file upload
+            document.getElementById('mappingFile' + type).addEventListener('change', function(e) {
+                var file = e.target.files[0]; if (!file) return;
+                var el = document.getElementById('mappingInfo' + type);
+
+                // 记录映射表文件名（用于后续自动分流判断）
+                mappingFileNames[type] = file.name;
+                var expectedChar = type === 'New' ? '新' : '旧';
+                if (file.name.indexOf(expectedChar) === -1) {
+                    showToast('⚠️ 建议' + (type === 'New' ? '新款' : '旧款') + '映射表文件名包含"' + expectedChar + '"字，当前文件：' + file.name, 'warning', 4000);
+                }
+
+                showFileStatus(el, file);
+                if (typeof XLSX === 'undefined') return showM1Error(type, 'XLSX 未加载，请刷新页面');
+                showLoadingOverlay('pivotTable' + type, '解析映射表中...');
+                var reader = new FileReader();
+                reader.onload = function(ev) {
+                    try {
+                        var data = new Uint8Array(ev.target.result);
+                        var wb = XLSX.read(data, { type: 'array' });
+                        var sheet = wb.Sheets[wb.SheetNames[0]];
+                        var json = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+                        skuMappings[type] = {}; var currentSku = '';
+                        for (var i = 1; i < json.length; i++) {
+                            var row = json[i]; if (!row || !Array.isArray(row)) continue;
+                            var parsed = parseExcelRow(row, 0, 4);
+                            var skuName = parsed[0], itemName = parsed[1], itemCode = parsed[2], quantity = parsed[3], unit = parsed[4];
+                            if (!skuName && currentSku) skuName = currentSku; else currentSku = skuName;
+                            if (skuName && !skuMappings[type][skuName]) skuMappings[type][skuName] = [];
+                            if (itemName && itemCode) { skuMappings[type][skuName].push({ '物料名称': itemName, '物料编码': itemCode, '数量': quantity, '单位': unit }); }
+                        }
+                        var mappingCount = Object.keys(skuMappings[type]).length;
+                        showToast('映射表解析成功：' + mappingCount + ' 个SKU', 'success');
+                        // 如果汇总数据已汇入 → 自动触发生成
+                        triggerAutoGenerate(type);
+                    } catch (err) { showM1Error(type, '解析映射表失败', err); showToast('映射表解析失败', 'error'); }
+                    finally { removeLoadingOverlay('pivotTable' + type); }
+                };
+                reader.readAsArrayBuffer(file);
+            });
+
+            // Order file upload
+            document.getElementById('orderFile' + type).addEventListener('change', function(e) {
+                var file = e.target.files[0]; if (!file) return;
+                var el = document.getElementById('orderInfo' + type);
+                showFileStatus(el, file);
+                if (typeof XLSX === 'undefined') return showM1Error(type, 'XLSX 未加载，请刷新页面');
+                showLoadingOverlay('pivotTable' + type, '解析订单表中...');
+                var reader = new FileReader();
+                reader.onload = function(ev) {
+                    try {
+                        var data = new Uint8Array(ev.target.result);
+                        var wb = XLSX.read(data, { type: 'array' });
+                        var sheet = wb.Sheets[wb.SheetNames[0]];
+                        var json = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+                        var parsed = [];
+                        for (var i = 1; i < json.length; i++) {
+                            var row = json[i]; if (!row || !Array.isArray(row)) continue;
+                            var receiver = safeParse(row[0]), sku = safeParse(row[1]);
+                            var qty = 1; if (row.length > 2) qty = parseQty(row[2]);
+                            if (receiver && sku) parsed.push({ '收件人信息': receiver, 'sku名称': sku, '购买数量': qty });
+                        }
+                        orderDatas[type] = parsed;
+                        showToast('订单数据解析成功：' + parsed.length + ' 条', 'success');
+                        triggerAutoGenerate(type);
+                    } catch (err) { showM1Error(type, '解析订单表失败', err); showToast('订单表解析失败', 'error'); }
+                    finally { removeLoadingOverlay('pivotTable' + type); }
+                };
+                reader.readAsArrayBuffer(file);
+            });
+
+            // Drag & drop for Module 1
+            setupDragDrop(document.getElementById('mappingZone' + type), document.getElementById('mappingFile' + type));
+            setupDragDrop(document.getElementById('orderZone' + type), document.getElementById('orderFile' + type));
+        });
+
+        function showLoadingOverlay(containerId, message) {
+            var container = document.getElementById(containerId);
+            if (!container) return;
+            var existing = container.querySelector('.loading-overlay');
+            if (existing) existing.remove();
+            var overlay = document.createElement('div');
+            overlay.className = 'loading-overlay';
+            overlay.innerHTML = '<span class="spinner"></span><span>' + (message || '处理中...') + '</span>';
+            // Insert before the first child (keep table if exists) or append
+            if (container.firstChild && container.firstChild.tagName === 'TABLE') {
+                container.insertBefore(overlay, container.firstChild);
+            } else {
+                container.innerHTML = '';
+                container.appendChild(overlay);
+            }
+        }
+
+        function removeLoadingOverlay(containerId) {
+            var container = document.getElementById(containerId);
+            if (!container) return;
+            var overlay = container.querySelector('.loading-overlay');
+            if (overlay) overlay.remove();
+        }
+
+        function showM1Error(type, msg, err) {
+            var el = document.getElementById('m1Status' + type);
+            el.innerHTML = '❌ ' + msg + (err ? ': ' + (err.message || err) : '');
+            el.className = 'm1-status error';
+        }
+
+        // ==========================================================
+        // Core: Generate Picking List (Financial Calculation)
+        // ==========================================================
+        function generatePickingList(type) {
+            var statusEl = document.getElementById('m1Status' + type);
+            if (typeof XLSX === 'undefined' || Object.keys(skuMappings[type]).length === 0 || orderDatas[type].length === 0) {
+                return showM1Error(type, '数据缺失，请先上传映射表和订单数据');
+            }
+
+            var result = pickingResults[type];
+            result.list = []; result.skuSet = new Set();
+            result.pivot = []; result.totalPrice = 0;
+
+            for (var i = 0; i < orderDatas[type].length; i++) {
+                var order = orderDatas[type][i];
+                var skuName = order['sku名称'], qty = order['购买数量'], receiver = order['收件人信息'];
+                var key = skuName.trim().toLowerCase();
+                var items = skuMappings[type][key];
+                if (!items) {
+                    var matchKey = Object.keys(skuMappings[type]).find(function(k) { return k.toLowerCase() === key; });
+                    if (matchKey) items = skuMappings[type][matchKey];
+                }
+
+                if (items && items.length) {
+                    items.forEach(function(item) {
+                        var base = safeParse(item['数量']); var itemQty = 1;
+                        if (base !== '') { var n = parseFloat(base); itemQty = isNaN(n) ? 1 : Math.max(0, n); }
+                        result.list.push([receiver, skuName, item['物料名称'], item['物料编码'], itemQty * qty, item['单位']]);
+                    });
+                } else {
+                    result.skuSet.add(skuName);
+                    result.list.push([receiver, skuName, '❌ SKU未找到', '', '', '']);
+                }
+            }
+
+            // Build financial pivot
+            var pivotMap = new Map();
+            for (var j = 0; j < result.list.length; j++) {
+                var row = result.list[j];
+                var materialName = row[2], code = row[3], rowQty = typeof row[4] === 'number' ? row[4] : 0, unit = row[5] || '';
+                if (!materialName || materialName.indexOf('❌') !== -1) continue;
+                if (!pivotMap.has(materialName)) pivotMap.set(materialName, { '编码': code, '单位': unit, '总数量': 0, '单价': 0 });
+                var entry = pivotMap.get(materialName); entry['总数量'] += rowQty;
+                if (!entry['编码'] && code) entry['编码'] = code;
+                if (!entry['单位'] && unit) entry['单位'] = unit;
+            }
+            result.pivot = Array.from(pivotMap.entries()).map(function(entry) {
+                var name = entry[0], data = entry[1];
+                return { '物料名称': name, '物料编码': data['编码'] || '—', '数量': data['总数量'], '单位': data['单位'] || '', '单价': 0 };
+            });
+            result.pivot.sort(function(a, b) { return b['数量'] - a['数量']; });
+
+            // Enable export buttons
+            document.getElementById('exportBtn' + type).disabled = false;
+            document.getElementById('exportMergedBtn').disabled = false;
+
+            // Toggle buttons: primary → hidden, regen → visible
+            if (m1AutoGenerated[type]) {
+                // This is a re-generation
+            } else {
+                m1AutoGenerated[type] = true;
+                document.getElementById('processBtn' + type).style.display = 'none';
+                document.getElementById('regenBtn' + type).style.display = 'inline-flex';
+            }
+
+            // Render table
+            renderFinancialPivot(type);
+
+            var msg;
+            if (result.skuSet.size > 0) {
+                msg = '⚠️ 以下SKU未找到: ' + Array.from(result.skuSet).join(', ');
+                statusEl.innerHTML = msg; statusEl.className = 'm1-status error';
+                showToast('备货单生成完成，但有 ' + result.skuSet.size + ' 个SKU未匹配', 'warning');
+            } else {
+                msg = '✅ 备货单生成成功！明细 ' + result.list.length + ' 行，汇总 ' + result.pivot.length + ' 项。';
+                statusEl.innerHTML = msg; statusEl.className = 'm1-status success';
+                showToast((type === 'New' ? '新款' : '旧款') + '备货单自动生成完成', 'success');
+            }
+        }
+
+        // ==========================================================
+        // Render Financial Pivot Table (with editable prices)
+        // ==========================================================
+        function renderFinancialPivot(type) {
+            var pivotData = pickingResults[type].pivot;
+            var containerId = type === 'New' ? 'pivotTableNew' : 'pivotTableOld';
+            var container = document.getElementById(containerId);
+            if (!container) return;
+
+            if (!pivotData.length) {
+                container.innerHTML = '<div class="empty-state"><span class="empty-icon">📊</span><div class="empty-title">暂无汇总数据</div><div class="empty-hint">订单中未匹配到有效物料</div></div>';
+                return;
+            }
+
+            var totalSum = 0;
+            pivotData.forEach(function(item) {
+                item['总价'] = (item['单价'] || 0) * item['数量'];
+                totalSum += item['总价'];
+            });
+            pickingResults[type].totalPrice = totalSum;
+
+            var html = '<table><thead><tr>' +
+                '<th>物料名称</th><th>物料编码 (XLOOKUP)</th><th>汇总数量</th><th>单位</th>' +
+                '<th style="min-width:80px;">单价</th><th style="min-width:80px;">总价</th>' +
+                '</tr></thead><tbody>';
+
+            for (var i = 0; i < pivotData.length; i++) {
+                var item = pivotData[i];
+                var codeDisplay = item['物料编码'] && item['物料编码'] !== '—' ?
+                    '<span style="color:#8ac4ff;font-weight:500;">' + item['物料编码'] + '</span>' :
+                    '<span style="color:#4a6a7a;font-size:0.75rem;">未匹配</span>';
+
+                html += '<tr>' +
+                    '<td style="color:#d0e8ff;">' + item['物料名称'] + '</td>' +
+                    '<td>' + codeDisplay + '</td>' +
+                    '<td style="font-weight:500;color:#b8d8ff;">' + item['数量'] + '</td>' +
+                    '<td>' + (item['单位'] || '') + '</td>' +
+                    '<td><div contenteditable="true" class="editable-price" data-type="' + type + '" data-index="' + i + '">' + (item['单价'] !== undefined && item['单价'] !== null && item['单价'] !== '' ? item['单价'] : 0) + '</div></td>' +
+                    '<td style="font-weight:500;color:#7ddfb0;" class="row-total">' + item['总价'].toFixed(2) + '</td>' +
+                    '</tr>';
+            }
+
+            html += '<tr style="background:rgba(251,191,36,0.06);border-top:2px solid rgba(251,191,36,0.3);">' +
+                '<td colspan="4" style="text-align:right;font-weight:600;color:#fbbf24;padding:12px 16px;">订单总价格：</td>' +
+                '<td></td>' +
+                '<td style="font-weight:800;color:#fbbf24;font-size:1.1rem;padding:12px 16px;" id="' + type + '-grand-total">' + totalSum.toFixed(2) + '</td>' +
+                '</tr></tbody></table>';
+            container.innerHTML = html;
+
+            // Bind input events for editable prices
+            container.querySelectorAll('.editable-price').forEach(function(el) {
+                el.addEventListener('input', function() {
+                    var t = this.dataset.type;
+                    var idx = parseInt(this.dataset.index);
+                    var newPrice = parseFloat(this.innerText) || 0;
+
+                    pickingResults[t].pivot[idx]['单价'] = newPrice;
+                    var qty = pickingResults[t].pivot[idx]['数量'];
+                    var total = newPrice * qty;
+                    pickingResults[t].pivot[idx]['总价'] = total;
+
+                    var row = this.closest('tr');
+                    var totalCell = row.querySelector('.row-total');
+                    if (totalCell) totalCell.innerText = total.toFixed(2);
+
+                    var sum = 0;
+                    pickingResults[t].pivot.forEach(function(item) { sum += (item['单价'] || 0) * item['数量']; });
+                    pickingResults[t].totalPrice = sum;
+                    var grandEl = document.getElementById(t + '-grand-total');
+                    if (grandEl) grandEl.innerText = sum.toFixed(2);
+                });
+            });
+
+            setupScrollIndicator(container);
+        }
+
+        // ==========================================================
+        // Financial AOA helper
+        // ==========================================================
+        function getFinancialAoa(pivotData, totalPrice) {
+            if (!pivotData || pivotData.length === 0) return [];
+            var rows = [['物料名称', '物料编码 (XLOOKUP)', '汇总数量', '单位', '单价', '总价']];
+            pivotData.forEach(function(item) {
+                var total = (item['单价'] || 0) * item['数量'];
+                rows.push([item['物料名称'], item['物料编码'], item['数量'], item['单位'], item['单价'] || 0, total]);
+            });
+            rows.push(['订单总价格', '', '', '', '', totalPrice]);
+            return rows;
+        }
+
+        // ==========================================================
+        // Module 1: Merge Export (Unified Logic)
+        // ==========================================================
+        function exportMergedExcel() {
+            var resultNew = pickingResults.New, resultOld = pickingResults.Old;
+            var hasNew = resultNew.list.length > 0, hasOld = resultOld.list.length > 0;
+
+            if (!hasNew && !hasOld) { showToast('请先至少生成一个备货单（新款或旧款）', 'warning'); return; }
+
+            var wb = XLSX.utils.book_new();
+            var labels = { New: '新款', Old: '旧款' };
+            var types = ['New', 'Old'];
+
+            // Add individual sheets
+            types.forEach(function(type) {
+                var result = pickingResults[type];
+                if (!result.list.length) return;
+                var detailData = [['收件人信息', 'SKU名称', '物料名称', '物料编码', '数量(乘算后)', '单位', '版本']];
+                result.list.forEach(function(r) { detailData.push(r.concat([labels[type]])); });
+                var pivotData = getFinancialAoa(result.pivot, result.totalPrice);
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(detailData), labels[type] + '备货明细');
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(pivotData), labels[type] + '透视汇总');
+            });
+
+            // Add merged pivot if both have data
+            if (hasNew && hasOld) {
+                var mergedMap = new Map();
+                [resultNew.list, resultOld.list].forEach(function(list) {
+                    list.forEach(function(row) {
+                        var name = row[2], code = row[3], qty = typeof row[4] === 'number' ? row[4] : 0, unit = row[5] || '';
+                        if (!name || name.indexOf('❌') !== -1) return;
+                        if (!mergedMap.has(name)) mergedMap.set(name, { '编码': code, '单位': unit, '总数量': 0 });
+                        var entry = mergedMap.get(name); entry['总数量'] += qty;
+                        if (!entry['编码'] && code) entry['编码'] = code;
+                        if (!entry['单位'] && unit) entry['单位'] = unit;
+                    });
+                });
+                var mergedPivotData = Array.from(mergedMap.entries()).map(function(entry) {
+                    return { '物料名称': entry[0], '物料编码': entry[1]['编码'] || '—', '数量': entry[1]['总数量'], '单位': entry[1]['单位'] || '', '单价': 0 };
+                });
+                mergedPivotData.sort(function(a, b) { return b['数量'] - a['数量']; });
+                // Calculate merged total price
+                var mergedTotal = mergedPivotData.reduce(function(sum, item) { return sum + (item['单价'] || 0) * item['数量']; }, 0);
+                var mergedAoa = getFinancialAoa(mergedPivotData, mergedTotal);
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(mergedAoa), '全局透视汇总');
+            }
+
+            var nameParts = []; if (hasNew) nameParts.push('新款'); if (hasOld) nameParts.push('旧款');
+            XLSX.writeFile(wb, '备货单_' + nameParts.join('+') + '_' + new Date().toISOString().slice(0, 10) + '.xlsx');
+            showToast('合并导出成功：' + nameParts.join(' + '), 'success');
+        }
+
+        // ==========================================================
+        // Module 1: Single Export
+        // ==========================================================
+        function exportToExcel(type) {
+            var result = pickingResults[type];
+            if (!result.list.length) { showToast('无数据可导出', 'warning'); return; }
+            var detailData = [['收件人信息', 'SKU名称', '物料名称', '物料编码', '数量(乘算后)', '单位']].concat(result.list);
+            var pivotData = getFinancialAoa(result.pivot, result.totalPrice);
+            var wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(detailData), '备货明细');
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(pivotData), '透视汇总');
+            XLSX.writeFile(wb, (type === 'New' ? '新款' : '旧款') + '_备货单_' + new Date().toISOString().slice(0, 10) + '.xlsx');
+            showToast((type === 'New' ? '新款' : '旧款') + '备货单导出成功', 'success');
+        }
+
+        // ==========================================================
+        // Module 2: Platform Config & Data
+        // ==========================================================
+        var PLATFORMS = [
+            {
+                id: 'tmallA', name: '天猫店铺 A', icon: '🟠', color: '#ff8c00',
+                config: {
+                    keepCols: ['主订单编号', '商品属性', '购买数量', '商品标题', '买家应付货款', '退款状态', '退款金额', '订单付款时间', '商家备注', '物流单号'],
+                    qtyAlias: ['购买数量', '数量', '商品数量'],
+                    priceAlias: ['买家应付货款', '实付金额', '应付金额']
+                }
+            },
+            {
+                id: 'tmallB', name: '天猫店铺 B', icon: '🟠', color: '#ff8c00',
+                config: {
+                    keepCols: ['主订单编号', '商品属性', '购买数量', '商品标题', '买家应付货款', '退款状态', '退款金额', '订单付款时间', '商家备注', '物流单号'],
+                    qtyAlias: ['购买数量', '数量', '商品数量'],
+                    priceAlias: ['买家应付货款', '实付金额', '应付金额']
+                }
+            },
+            {
+                id: 'pdd', name: '拼多多订单', icon: '🔴', color: '#e8384a',
+                tip: { icon: '🚫', text: '自动剔除"未发货退款"和"已取消"' },
+                config: {
+                    keepCols: ['订单号', '商品规格', '商品数量(件)', '商品', '商家实收金额(元)', '订单状态', '商家备注', '快递单号', '订单成交时间'],
+                    statusCol: '订单状态', filterOutStatus: ['未发货，退款成功', '已取消'],
+                    priceAlias: ['商家实收金额(元)', '实付金额', '应付金额']
+                }
+            },
+            {
+                id: 'jd', name: '京东订单', icon: '🟣', color: '#8b5cf6',
+                tip: { icon: '✂️', text: '自动去重 + 以第一个空格拆分属性' },
+                config: {
+                    keepCols: ['订单号', '商品属性', '订购数量', '商品名称', '商家应收', '订单状态', '付款确认时间', '商家备注'],
+                    rawCols: { orderNo: '订单号', prodName: '商品名称', qty: '订购数量', price: '商家应收', status: '订单状态', payTime: '付款确认时间', memo: '商家备注' },
+                    priceAlias: ['商家应收', '实付金额', '应付金额']
+                }
+            }
+        ];
+
+        // Dynamically build dataStore
+        var dataStore = {};
+        PLATFORMS.forEach(function(p) { dataStore[p.id] = { allData: [], headers: [], filteredData: [] }; });
+
+        // ==========================================================
+        // Module 2: Dynamic Card Rendering
+        // ==========================================================
+        function buildM2Card(p) {
+            var tipHtml = '';
+            if (p.tip) {
+                tipHtml = '<div class="m2-tip">' + p.tip.icon + ' ' + p.tip.text + '</div>';
+            }
+            return '<div class="m2-card" id="card-' + p.id + '">' +
+                '<div class="c-title"><span>' + p.icon + '</span> ' + p.name + '</div>' +
+                '<div class="c-upload upload-zone" id="zone-' + p.id + '" onclick="document.getElementById(\'file-' + p.id + '\').click()">' +
+                    '<div style="display:flex; justify-content:space-between; font-size:13px; color:#6a9aba;">' +
+                        '<span>📂 选择文件或拖拽至此</span><span style="color:#e8edf5;">.xlsx .csv</span>' +
+                    '</div>' +
+                    '<input type="file" id="file-' + p.id + '" data-platform="' + p.id + '" accept=".xlsx,.xls,.csv" style="display:none;" />' +
+                '</div>' +
+                '<div style="display:flex;align-items:center;gap:6px;margin:6px 0;">' +
+                    '<span id="status-' + p.id + '" style="font-size:12px; color:#3a5a7a; flex:1;">等待上传...</span>' +
+                    '<button class="file-clear" onclick="clearPlatform(\'' + p.id + '\')" title="清除文件" style="font-size:0.85rem;padding:0 6px;">✕</button>' +
+                '</div>' +
+                tipHtml +
+                '<div class="m2-filter">' +
+                    '<select id="col-' + p.id + '" data-platform="' + p.id + '" onchange="applyFilter(\'' + p.id + '\')"></select>' +
+                    '<input type="text" id="key-' + p.id + '" data-platform="' + p.id + '" class="m2-keyword" placeholder="条件1 关键词" />' +
+                '</div>' +
+                '<div class="m2-filter">' +
+                    '<select id="col2-' + p.id + '" data-platform="' + p.id + '" onchange="applyFilter(\'' + p.id + '\')"></select>' +
+                    '<input type="text" id="key2-' + p.id + '" data-platform="' + p.id + '" class="m2-keyword" placeholder="条件2 关键词 (AND)" />' +
+                '</div>' +
+                '<div class="m2-filter">' +
+                    '<select id="col3-' + p.id + '" data-platform="' + p.id + '" onchange="applyFilter(\'' + p.id + '\')"></select>' +
+                    '<input type="text" id="key3-' + p.id + '" data-platform="' + p.id + '" class="m2-keyword" placeholder="条件3 关键词 (AND)" />' +
+                '</div>' +
+                '<div class="table-scroll" style="flex:1; max-height:220px; border:1px solid rgba(0,180,255,0.05); border-radius:8px; background:rgba(0,10,30,0.3);">' +
+                    '<table><thead id="head-' + p.id + '"></thead><tbody id="body-' + p.id + '"><tr><td class="empty-state" style="padding:20px 0;"><span class="empty-icon">📂</span>请上传文件</td></tr></tbody></table>' +
+                '</div>' +
+                '<button class="m2-down-btn" id="dl-' + p.id + '" data-platform="' + p.id + '" disabled>⬇️ 导出结果</button>' +
+            '</div>';
+        }
+
+        function renderModule2Cards() {
+            var grid = document.getElementById('m2Grid');
+            grid.innerHTML = PLATFORMS.map(function(p) { return buildM2Card(p); }).join('');
+
+            // Setup drag-drop for each platform
+            PLATFORMS.forEach(function(p) {
+                var zone = document.getElementById('zone-' + p.id);
+                var input = document.getElementById('file-' + p.id);
+                setupDragDrop(zone, input);
+
+                // File change handler
+                input.addEventListener('change', function(e) { handleFile(p.id, e); });
+            });
+
+            // Event delegation for keyword input (debounced auto-filter)
+            grid.addEventListener('input', debounce(function(e) {
+                if (e.target.matches('.m2-keyword')) {
+                    var platform = e.target.dataset.platform;
+                    applyFilter(platform);
+                }
+            }, 300));
+
+            // Event delegation for download buttons
+            grid.addEventListener('click', function(e) {
+                if (e.target.matches('.m2-down-btn')) {
+                    var platform = e.target.dataset.platform;
+                    downloadFile(platform);
+                }
+            });
+        }
+
+        // ==========================================================
+        // Module 2: File Handling
+        // ==========================================================
+        function handleFile(platform, event) {
+            var file = event.target.files[0]; if (!file) return;
+            var statusEl = document.getElementById('status-' + platform);
+            statusEl.innerHTML = '<span style="color:#f0c060;">⏳ 解析中...</span>';
+            showToast('正在解析 ' + file.name + '...', 'info', 2000);
+
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    var data = new Uint8Array(e.target.result);
+                    var wb = XLSX.read(data, { type: 'array' });
+                    var sheet = wb.Sheets[wb.SheetNames[0]];
+                    var json = XLSX.utils.sheet_to_json(sheet);
+                    if (!json || json.length === 0) {
+                        statusEl.innerHTML = '<span style="color:#f08080;">⚠️ 文件为空</span>';
+                        showToast('文件为空，请检查', 'error');
+                        return;
+                    }
+                    var finalData = json, headers = Object.keys(json[0]);
+
+                    // Platform-specific processing
+                    if (platform === 'pdd') {
+                        var statusCol = PLATFORMS.find(function(x) { return x.id === 'pdd'; }).config.statusCol;
+                        var filterOut = PLATFORMS.find(function(x) { return x.id === 'pdd'; }).config.filterOutStatus;
+                        if (headers.indexOf(statusCol) !== -1) {
+                            finalData = finalData.filter(function(row) {
+                                var st = String(row[statusCol] || '').trim();
+                                return filterOut.indexOf(st) === -1;
+                            });
+                        }
+                    }
+
+                    if (platform === 'jd') {
+                        var jdCfg = PLATFORMS.find(function(x) { return x.id === 'jd'; }).config.rawCols;
+                        var orderCol = jdCfg.orderNo;
+                        if (headers.indexOf(orderCol) !== -1) {
+                            var seen = new Set();
+                            finalData = finalData.filter(function(row) {
+                                var k = String(row[orderCol] || '');
+                                if (seen.has(k)) return false; seen.add(k); return true;
+                            });
+                        }
+                        var nameCol = jdCfg.prodName;
+                        if (headers.indexOf(nameCol) !== -1) {
+                            finalData = finalData.map(function(row) {
+                                var fullName = String(row[nameCol] || '');
+                                var spaceIdx = fullName.indexOf(' ');
+                                var pName = fullName, pSku = '';
+                                if (spaceIdx !== -1) { pName = fullName.substring(0, spaceIdx).trim(); pSku = fullName.substring(spaceIdx).trim(); }
+                                row['商品名称'] = pName; row['商品属性'] = pSku; return row;
+                            });
+                            headers = Object.keys(finalData[0]);
+                        }
+                    }
+
+                    dataStore[platform].allData = finalData;
+                    dataStore[platform].headers = headers;
+                    dataStore[platform].filteredData = finalData;
+
+                    var fileNameDisplay = file.name.length > 30 ? file.name.substring(0, 27) + '...' : file.name;
+                    statusEl.innerHTML = '<span style="color:#5ddfa0;">✅ ' + finalData.length + ' 条 | ' + fileNameDisplay + '</span>';
+                    initDropdown(platform);
+                    applyFilter(platform); // 内部已调用 updateSummary → distributeOrdersToModules → triggerAutoGenerate
+                    showToast(PLATFORMS.find(function(x) { return x.id === platform; }).name + '：解析完成 ' + finalData.length + ' 条', 'success');
+                } catch (err) {
+                    statusEl.innerHTML = '<span style="color:#f08080;">❌ 格式错误</span>';
+                    showToast('文件解析失败，请检查格式', 'error');
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function initDropdown(platform) {
+            // 初始化条件1下拉框
+            var selectEl = document.getElementById('col-' + platform);
+            selectEl.innerHTML = '';
+            var headers = dataStore[platform].headers;
+            if (!headers.length) return;
+            headers.forEach(function(col) {
+                var opt = document.createElement('option');
+                opt.value = col; opt.text = col; selectEl.appendChild(opt);
+            });
+            // 初始化条件2下拉框（与条件1相同的列选项）
+            var selectEl2 = document.getElementById('col2-' + platform);
+            if (selectEl2) {
+                selectEl2.innerHTML = '';
+                headers.forEach(function(col) {
+                    var opt = document.createElement('option');
+                    opt.value = col; opt.text = col; selectEl2.appendChild(opt);
+                });
+            }
+            // 初始化条件3下拉框
+            var selectEl3 = document.getElementById('col3-' + platform);
+            if (selectEl3) {
+                selectEl3.innerHTML = '';
+                headers.forEach(function(col) {
+                    var opt = document.createElement('option');
+                    opt.value = col; opt.text = col; selectEl3.appendChild(opt);
+                });
+            }
+        }
+
+        function applyFilter(platform) {
+            // ===== 条件1 =====
+            var colName1 = document.getElementById('col-' + platform).value;
+            var keyword1 = document.getElementById('key-' + platform).value.trim();
+            // ===== 条件2 =====
+            var colName2 = document.getElementById('col2-' + platform).value;
+            var keyword2 = document.getElementById('key2-' + platform).value.trim();
+            // ===== 条件3 =====
+            var colName3 = document.getElementById('col3-' + platform).value;
+            var keyword3 = document.getElementById('key3-' + platform).value.trim();
+
+            var data = dataStore[platform].allData;
+            if (!data || data.length === 0) return;
+
+            // 交集（AND）筛选：同时满足条件1、条件2、条件3
+            var filtered = data;
+            if (keyword1 !== '') {
+                filtered = filtered.filter(function(row) {
+                    var val = row[colName1];
+                    return val !== undefined && val !== null && String(val).indexOf(keyword1) !== -1;
+                });
+            }
+            if (keyword2 !== '') {
+                filtered = filtered.filter(function(row) {
+                    var val = row[colName2];
+                    return val !== undefined && val !== null && String(val).indexOf(keyword2) !== -1;
+                });
+            }
+            if (keyword3 !== '') {
+                filtered = filtered.filter(function(row) {
+                    var val = row[colName3];
+                    return val !== undefined && val !== null && String(val).indexOf(keyword3) !== -1;
+                });
+            }
+            dataStore[platform].filteredData = filtered;
+
+            // Determine display columns
+            var displayCols = [];
+            var pCfg = PLATFORMS.find(function(x) { return x.id === platform; }).config;
+            if (platform === 'jd') {
+                displayCols = pCfg.keepCols.filter(function(c) { return dataStore[platform].headers.indexOf(c) !== -1; });
+            } else if (platform === 'pdd') {
+                displayCols = pCfg.keepCols.filter(function(c) { return dataStore[platform].headers.indexOf(c) !== -1; });
+            } else {
+                displayCols = pCfg.keepCols.filter(function(c) {
+                    if (c === '购买数量') {
+                        return pCfg.qtyAlias.some(function(alias) { return dataStore[platform].headers.indexOf(alias) !== -1; });
+                    }
+                    return dataStore[platform].headers.indexOf(c) !== -1;
+                });
+            }
+            if (displayCols.length === 0) displayCols = dataStore[platform].headers;
+
+            // Render table
+            var theadHtml = '<tr>';
+            displayCols.forEach(function(col) { theadHtml += '<th>' + col + '</th>'; });
+            theadHtml += '</tr>';
+            document.getElementById('head-' + platform).innerHTML = theadHtml;
+
+            var tbodyHtml = '';
+            var limit = Math.min(filtered.length, 50);
+            for (var i = 0; i < limit; i++) {
+                tbodyHtml += '<tr>';
+                displayCols.forEach(function(col) { var val = filtered[i][col] || ''; tbodyHtml += '<td title="' + val + '">' + val + '</td>'; });
+                tbodyHtml += '</tr>';
+            }
+            if (filtered.length > 50) tbodyHtml += '<tr><td colspan="' + displayCols.length + '" style="text-align:center;color:#4a6a7a;padding:6px;">... 预览前50条，共 ' + filtered.length + ' 条 ...</td></tr>';
+            else if (filtered.length === 0) tbodyHtml = '<tr><td colspan="' + displayCols.length + '" class="empty-state" style="padding:12px 0;"><span class="empty-icon">🔍</span>无匹配记录</td></tr>';
+            document.getElementById('body-' + platform).innerHTML = tbodyHtml;
+            document.getElementById('dl-' + platform).disabled = (filtered.length === 0);
+
+            // 先更新全平台汇总 → 再自动分流到备货模块
+            console.log('[applyFilter] platform=' + platform + ' filtered=' + filtered.length + ' allData=' + data.length);
+            updateSummary();
+            distributeOrdersToModules();
+        }
+
+        // ==========================================================
+        // Auto-distribute: 使用和 updateSummary 完全相同的 mapRules，
+        // 从全平台统一汇总的数据源（filteredData）提取前三列 → 注入 Module1
+        // ==========================================================
+        var mapRules = {
+            tmallA: { orderId: '主订单编号', attr: '商品属性', qty: '购买数量', label: '天猫A' },
+            tmallB: { orderId: '主订单编号', attr: '商品属性', qty: '购买数量', label: '天猫B' },
+            pdd: { orderId: '订单号', attr: '商品规格', qty: '商品数量(件)', label: '拼多多' },
+            jd: { orderId: '订单号', attr: '商品属性', qty: '订购数量', label: '京东' }
+        };
+        var noteAliases = ['商家备注', '备注', '订单备注'];
+
+        function distributeOrdersToModules() {
+            orderDatas.New = []; orderDatas.Old = [];
+
+            // === summaryData 就是全平台统一汇总表的前三列 + 备注 ===
+            // 由 updateSummary() 填充，与页面上显示的汇总表完全一致
+
+            // === 检测筛选器输入是否含"新"或"旧" ===
+            var filterTargetsNew = false;
+            var filterTargetsOld = false;
+            PLATFORMS.forEach(function(p) {
+                var k1 = document.getElementById('key-' + p.id);
+                var k2 = document.getElementById('key2-' + p.id);
+                var k3 = document.getElementById('key3-' + p.id);
+                var all = (k1 ? k1.value : '') + (k2 ? k2.value : '') + (k3 ? k3.value : '');
+                if (all.indexOf('新') !== -1) filterTargetsNew = true;
+                if (all.indexOf('旧') !== -1) filterTargetsOld = true;
+            });
+
+            // === 映射表文件名条件 ===
+            var mappingHasNew = mappingFileNames['New'] !== '' && mappingFileNames['New'].indexOf('新') !== -1;
+            var mappingHasOld = mappingFileNames['Old'] !== '' && mappingFileNames['Old'].indexOf('旧') !== -1;
+
+            console.log('[distribute] summaryData=' + summaryData.length + ' filterNew=' + filterTargetsNew + ' filterOld=' + filterTargetsOld + ' mapNew=' + mappingHasNew + ' mapOld=' + mappingHasOld);
+
+            // === 核心路由逻辑 ===
+            // 策略：如果筛选器已经输入了"新"/"旧"，就信任筛选结果
+            // 筛选器含"新" + 映射文件名含"新" → 全部汇入新款
+            // 筛选器含"旧" + 映射文件名含"旧" → 全部汇入旧款
+            // 否则回退到备注内容判断
+
+            var routeToNew = (filterTargetsNew && mappingHasNew);
+            var routeToOld = (filterTargetsOld && mappingHasOld);
+
+            summaryData.forEach(function(item) {
+                var note = item.note || '';
+                var orderEntry = {
+                    '收件人信息': item['主订单编号'],
+                    'sku名称': item['商品属性'],
+                    '购买数量': parseQty(item['购买数量'])
+                };
+
+                if (routeToNew) {
+                    // 筛选器明确筛选"新" → 全部汇入新款
+                    orderDatas.New.push(orderEntry);
+                } else if (routeToOld) {
+                    // 筛选器明确筛选"旧" → 全部汇入旧款
+                    orderDatas.Old.push(orderEntry);
+                } else if (note.indexOf('旧') !== -1) {
+                    orderDatas.Old.push(orderEntry);
+                } else if (note.indexOf('新') !== -1) {
+                    orderDatas.New.push(orderEntry);
+                }
+                // 不含新/旧的不汇入
+            });
+
+            console.log('[distribute] 路由结果 New=' + orderDatas.New.length + ' Old=' + orderDatas.Old.length);
+
+            triggerAutoGenerate('New');
+            triggerAutoGenerate('Old');
+        }
+
+        // 条件满足时直接触发生成
+        function triggerAutoGenerate(type) {
+            var label = type === 'New' ? '新款' : '旧款';
+            var char = type === 'New' ? '新' : '旧';
+            var oi = document.getElementById('orderInfo' + type);
+            var xlsxOk = typeof XLSX !== 'undefined';
+            var hasData = orderDatas[type].length > 0;
+            var hasMapping = Object.keys(skuMappings[type]).length > 0;
+            var mappingNameOk = mappingFileNames[type] !== '' && mappingFileNames[type].indexOf(char) !== -1;
+
+            console.log('[trigger] type=' + type + ' hasData=' + hasData + ' hasMapping=' + hasMapping + ' mappingNameOk=' + mappingNameOk + ' xlsxOk=' + xlsxOk);
+
+            if (hasData && hasMapping && xlsxOk) {
+                oi.innerHTML = '✅ 汇总前三列汇入 ' + orderDatas[type].length + ' 条';
+                oi.className = 'm1-file-status';
+                document.getElementById('m1Status' + type).innerHTML = '✅ 条件满足（筛选含"' + char + '" + 映射含"' + char + '"）→ 全平台汇总前三列自动汇入，生成备货单';
+                document.getElementById('m1Status' + type).className = 'm1-status success';
+                document.getElementById('exportBtn' + type).disabled = false;
+                document.getElementById('exportMergedBtn').disabled = false;
+                document.getElementById('processBtn' + type).style.display = 'none';
+                document.getElementById('regenBtn' + type).style.display = 'inline-flex';
+                document.getElementById('regenBtn' + type).disabled = false;
+                m1AutoGenerated[type] = true;
+                generatePickingList(type);
+            } else if (hasData && !hasMapping) {
+                oi.innerHTML = '✅ 汇总前三列就绪 ' + orderDatas[type].length + ' 条';
+                oi.className = 'm1-file-status';
+                var hint = mappingNameOk ? '' : '（建议文件名含"' + char + '"）';
+                document.getElementById('m1Status' + type).innerHTML = '⏳ 全平台汇总已就绪 ' + orderDatas[type].length + ' 条，请上传' + label + 'SKU映射表' + hint;
+                document.getElementById('m1Status' + type).className = 'm1-status info';
+            } else if (!hasData) {
+                oi.textContent = '等待全平台汇总汇入...';
+                oi.className = 'm1-file-status empty';
+            }
+        }
+
+        // ==========================================================
+        // Clear functions — 删除已上传文件
+        // ==========================================================
+        function clearMapping(type) {
+            var fileInput = document.getElementById('mappingFile' + type);
+            var statusEl = document.getElementById('mappingInfo' + type);
+            fileInput.value = '';
+            statusEl.textContent = '未上传';
+            statusEl.className = 'm1-file-status empty';
+            skuMappings[type] = {};
+            mappingFileNames[type] = '';
+            m1AutoGenerated[type] = false;
+            document.getElementById('processBtn' + type).style.display = 'inline-flex';
+            document.getElementById('regenBtn' + type).style.display = 'none';
+            document.getElementById('exportBtn' + type).disabled = true;
+            document.getElementById('pivotTable' + type).innerHTML = '<div class="empty-state"><span class="empty-icon">📊</span><div class="empty-title">生成' + (type === 'New' ? '新款' : '旧款') + '备货单</div><div class="empty-hint">上传映射表 + 汇总数据后自动生成</div></div>';
+            document.getElementById('m1Status' + type).innerHTML = '';
+            document.getElementById('m1Status' + type).className = 'm1-status';
+            showToast('已清除' + (type === 'New' ? '新款' : '旧款') + '映射表', 'info');
+            triggerAutoGenerate(type);
+        }
+
+        function clearOrderData(type) {
+            var fileInput = document.getElementById('orderFile' + type);
+            var statusEl = document.getElementById('orderInfo' + type);
+            fileInput.value = '';
+            orderDatas[type] = [];
+            statusEl.textContent = '等待汇总数据汇入...';
+            statusEl.className = 'm1-file-status empty';
+            m1AutoGenerated[type] = false;
+            document.getElementById('processBtn' + type).style.display = 'inline-flex';
+            document.getElementById('regenBtn' + type).style.display = 'none';
+            document.getElementById('exportBtn' + type).disabled = true;
+            document.getElementById('pivotTable' + type).innerHTML = '<div class="empty-state"><span class="empty-icon">📊</span><div class="empty-title">生成' + (type === 'New' ? '新款' : '旧款') + '备货单</div><div class="empty-hint">上传映射表 + 汇总数据后自动生成</div></div>';
+            document.getElementById('m1Status' + type).innerHTML = '';
+            document.getElementById('m1Status' + type).className = 'm1-status';
+            showToast('已清除' + (type === 'New' ? '新款' : '旧款') + '订单数据', 'info');
+            triggerAutoGenerate(type);
+        }
+
+        function clearPlatform(platform) {
+            var fileInput = document.getElementById('file-' + platform);
+            fileInput.value = '';
+            dataStore[platform] = { allData: [], headers: [], filteredData: [] };
+            document.getElementById('status-' + platform).innerHTML = '等待上传...';
+            document.getElementById('head-' + platform).innerHTML = '';
+            document.getElementById('body-' + platform).innerHTML = '<tr><td class="empty-state" style="padding:20px 0;"><span class="empty-icon">📂</span>请上传文件</td></tr>';
+            document.getElementById('dl-' + platform).disabled = true;
+            // 清空三个下拉框
+            ['col-', 'col2-', 'col3-'].forEach(function(prefix) {
+                var sel = document.getElementById(prefix + platform);
+                if (sel) sel.innerHTML = '';
+            });
+            // 清空三个关键词框
+            ['key-', 'key2-', 'key3-'].forEach(function(prefix) {
+                var inp = document.getElementById(prefix + platform);
+                if (inp) inp.value = '';
+            });
+            showToast('已清除' + (PLATFORMS.find(function(x) { return x.id === platform; }) || {}).name || platform, 'info');
+            updateSummary();
+            distributeOrdersToModules();
+        }
+
+        // ==========================================================
+        // Price helper for summary
+        // ==========================================================
+        function getPrice(row, aliases) {
+            for (var i = 0; i < aliases.length; i++) {
+                var val = row[aliases[i]];
+                if (val !== undefined && val !== null && val !== '') return val;
+            }
+            return '';
+        }
+
+        // ==========================================================
+        // 全局汇总数据（updateSummary 填充，distributeOrdersToModules 消费）
+        // ==========================================================
+        var summaryData = []; // [{ 主订单编号, 商品属性, 购买数量, note }]
+
+        // ==========================================================
+        // Update summary table
+        // ==========================================================
+        function updateSummary() {
+            var allMergedItems = [];
+            summaryData = []; // 重置
+            var mapRulesLocal = {
+                tmallA: { orderId: '主订单编号', attr: '商品属性', qty: '购买数量', label: '天猫A' },
+                tmallB: { orderId: '主订单编号', attr: '商品属性', qty: '购买数量', label: '天猫B' },
+                pdd: { orderId: '订单号', attr: '商品规格', qty: '商品数量(件)', label: '拼多多' },
+                jd: { orderId: '订单号', attr: '商品属性', qty: '订购数量', label: '京东' }
+            };
+
+            PLATFORMS.forEach(function(p) {
+                var rows = dataStore[p.id].filteredData;
+                if (!rows || rows.length === 0) return;
+                var cfg = PLATFORMS.find(function(x) { return x.id === p.id; }).config;
+                var map = mapRulesLocal[p.id];
+                rows.forEach(function(row) {
+                    var price = getPrice(row, cfg.priceAlias);
+                    var oid = row[map.orderId] || '';
+                    var atr = row[map.attr] || '';
+                    var qty = row[map.qty] || '';
+                    allMergedItems.push({
+                        '主订单编号': oid,
+                        '商品属性': atr,
+                        '购买数量': qty,
+                        '来源平台': map.label,
+                        '对应订单金额': price
+                    });
+                    // 同步保存汇总前三列+备注，供 distributeOrdersToModules 消费
+                    var rowNote = '';
+                    for (var ni2 = 0; ni2 < noteAliases.length; ni2++) {
+                        if (row[noteAliases[ni2]] !== undefined) { rowNote = String(row[noteAliases[ni2]] || '').trim(); break; }
+                    }
+                    summaryData.push({
+                        '主订单编号': oid,
+                        '商品属性': atr,
+                        '购买数量': qty,
+                        'note': rowNote
+                    });
+                });
+            });
+
+            console.log('[updateSummary] allMergedItems=' + allMergedItems.length + ' summaryData=' + summaryData.length);
+
+            if (allMergedItems.length > 0) {
+                document.getElementById('summaryCount').innerText = '共 ' + allMergedItems.length + ' 条';
+                document.getElementById('summaryDownloadBtn').disabled = false;
+                document.getElementById('summaryTop3Btn').disabled = false;
+                var headers = ['主订单编号', '商品属性', '购买数量', '来源平台', '对应订单金额'];
+                var sumHeadHtml = '<tr>'; headers.forEach(function(col) { sumHeadHtml += '<th>' + col + '</th>'; }); sumHeadHtml += '</tr>';
+                document.getElementById('summaryHead').innerHTML = sumHeadHtml;
+                var sumBodyHtml = '';
+                var limit = Math.min(allMergedItems.length, 100);
+                for (var i = 0; i < limit; i++) {
+                    sumBodyHtml += '<tr>';
+                    headers.forEach(function(col) { var val = allMergedItems[i][col] || ''; sumBodyHtml += '<td title="' + val + '">' + val + '</td>'; });
+                    sumBodyHtml += '</tr>';
+                }
+                if (allMergedItems.length > 100) sumBodyHtml += '<tr><td colspan="5" style="text-align:center;color:#4a6a7a;padding:6px;">... 预览前100条，共 ' + allMergedItems.length + ' 条 ...</td></tr>';
+                document.getElementById('summaryBody').innerHTML = sumBodyHtml;
+                setupScrollIndicator(document.getElementById('summaryScroll'));
+            } else {
+                document.getElementById('summaryCount').innerText = '共 0 条';
+                document.getElementById('summaryDownloadBtn').disabled = true;
+                document.getElementById('summaryTop3Btn').disabled = true;
+                document.getElementById('summaryHead').innerHTML = '';
+                document.getElementById('summaryBody').innerHTML = '<tr><td colspan="5" class="empty-state"><span class="empty-icon">📋</span><div class="empty-title">暂无汇总数据</div><div class="empty-hint">请上传并筛选任一平台订单数据</div></td></tr>';
+            }
+        }
+
+        // ==========================================================
+        // Module 2: Download filtered results
+        // ==========================================================
+        function downloadFile(platform) {
+            var keyword = document.getElementById('key-' + platform).value.trim();
+            var filtered = dataStore[platform].filteredData;
+            if (!filtered || filtered.length === 0) { showToast('无数据可下载', 'warning'); return; }
+
+            var downloadCols = [];
+            var pCfg = PLATFORMS.find(function(x) { return x.id === platform; }).config;
+            if (platform === 'jd') {
+                downloadCols = pCfg.keepCols.filter(function(c) { return dataStore[platform].headers.indexOf(c) !== -1; });
+            } else if (platform === 'pdd') {
+                downloadCols = pCfg.keepCols.filter(function(c) { return dataStore[platform].headers.indexOf(c) !== -1; });
+            } else {
+                downloadCols = pCfg.keepCols.filter(function(c) {
+                    if (c === '购买数量') {
+                        return pCfg.qtyAlias.some(function(alias) { return dataStore[platform].headers.indexOf(alias) !== -1; });
+                    }
+                    return dataStore[platform].headers.indexOf(c) !== -1;
+                });
+            }
+            if (downloadCols.length === 0) downloadCols = dataStore[platform].headers;
+
+            var downloadData = filtered.map(function(row) {
+                var newRow = {};
+                downloadCols.forEach(function(col) { newRow[col] = row[col] !== undefined ? row[col] : ''; });
+                return newRow;
+            });
+            var ws = XLSX.utils.json_to_sheet(downloadData);
+            var wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, '结果');
+            ws['!cols'] = downloadCols.map(function() { return { wch: 18 }; });
+            var name = PLATFORMS.find(function(x) { return x.id === platform; }).name;
+            XLSX.writeFile(wb, name + '_筛选结果_' + (keyword || '全部') + '.xlsx');
+            showToast(name + ' 筛选结果导出成功', 'success');
+        }
+
+        // ==========================================================
+        // Module 2: Download summary
+        // ==========================================================
+        function downloadSummary(type) {
+            var allMergedItems = [];
+            var mapRules = {
+                tmallA: { orderId: '主订单编号', attr: '商品属性', qty: '购买数量', label: '天猫A' },
+                tmallB: { orderId: '主订单编号', attr: '商品属性', qty: '购买数量', label: '天猫B' },
+                pdd: { orderId: '订单号', attr: '商品规格', qty: '商品数量(件)', label: '拼多多' },
+                jd: { orderId: '订单号', attr: '商品属性', qty: '订购数量', label: '京东' }
+            };
+
+            PLATFORMS.forEach(function(p) {
+                var rows = dataStore[p.id].filteredData;
+                if (!rows || rows.length === 0) return;
+                var cfg = PLATFORMS.find(function(x) { return x.id === p.id; }).config;
+                var map = mapRules[p.id];
+                rows.forEach(function(row) {
+                    var price = getPrice(row, cfg.priceAlias);
+                    allMergedItems.push({
+                        '主订单编号': row[map.orderId] || '',
+                        '商品属性': row[map.attr] || '',
+                        '购买数量': row[map.qty] || '',
+                        '来源平台': map.label,
+                        '对应订单金额': price
+                    });
+                });
+            });
+
+            if (allMergedItems.length === 0) { showToast('当前无汇总数据可下载', 'warning'); return; }
+
+            var dataToExport = allMergedItems;
+            var headers = ['主订单编号', '商品属性', '购买数量', '来源平台', '对应订单金额'];
+            if (type === 'top3') {
+                dataToExport = allMergedItems.map(function(item) {
+                    return { '主订单编号': item['主订单编号'], '商品属性': item['商品属性'], '购买数量': item['购买数量'] };
+                });
+                headers = ['主订单编号', '商品属性', '购买数量'];
+            }
+            var ws = XLSX.utils.json_to_sheet(dataToExport);
+            var wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, '统一汇总');
+            ws['!cols'] = headers.map(function() { return { wch: 22 }; });
+            var suffix = type === 'top3' ? '前三列数据' : '完整汇总';
+            XLSX.writeFile(wb, '全平台统一订单_' + suffix + '.xlsx');
+            showToast('全平台汇总导出成功', 'success');
+        }
+
+        // ==========================================================
+        // Initialize Module 2 cards
+        // ==========================================================
+        renderModule2Cards();
+    </script>
+</body>
+</html>
