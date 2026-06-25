@@ -563,9 +563,11 @@
                     <div class="summary-header">
                         <div class="summary-title">📊 全平台订单统一汇总</div>
                         <div class="summary-actions">
-                            <span id="summaryCount" style="font-size:0.8rem; color:#64748b; margin-right:10px;">共 0 条</span>
-                            <button class="summary-btn full" id="summaryDownloadBtn" onclick="downloadSummary('full')" disabled>⬇ 下载统一汇总数据</button>
-                            <button class="summary-btn top3" id="summaryTop3Btn" onclick="downloadSummary('top3')" disabled>⬇ 下载前三列数据</button>
+                            <span id="summaryCount" style="font-size:0.8rem; color:#64748b;">共 0 条</span>
+                            <span id="summaryAmount" style="font-size:0.85rem; color:#f59e0b; font-weight:600; margin:0 12px; padding:4px 12px; background:rgba(245,158,11,0.08); border-radius:20px; border:1px solid rgba(245,158,11,0.15);">💰 0.00</span>
+                            <input type="text" id="summaryNoteFilter" placeholder="商家备注筛选" style="background:#f8fafc;border:1px solid #e2e8f0;color:#334155;padding:5px 10px;border-radius:6px;font-size:0.75rem;width:120px;font-family:inherit;" oninput="updateSummary()" />
+                            <button class="summary-btn full" id="summaryDownloadBtn" onclick="downloadSummary('full')" disabled>⬇ 下载汇总</button>
+                            <button class="summary-btn top3" id="summaryTop3Btn" onclick="downloadSummary('top3')" disabled>⬇ 下载前三列</button>
                         </div>
                     </div>
                     <div class="table-scroll" id="summaryScroll" style="max-height:350px; border:1px solid #e2e8f0; border-radius:10px; background:#fafbfc;">
@@ -1579,21 +1581,44 @@
                 var map = mapRules[p.id];
                 rows.forEach(function(row) {
                     var price = getPrice(row, cfg.priceAlias);
+                    // 提取商家备注
+                    var note = '';
+                    var noteAliases = ['商家备注', '备注', '订单备注'];
+                    for (var ni = 0; ni < noteAliases.length; ni++) {
+                        if (row[noteAliases[ni]] !== undefined) { note = String(row[noteAliases[ni]] || '').trim(); break; }
+                    }
                     allMergedItems.push({
                         '主订单编号': row[map.orderId] || '',
                         '商品属性': row[map.attr] || '',
                         '购买数量': row[map.qty] || '',
                         '来源平台': map.label,
-                        '对应订单金额': price
+                        '对应订单金额': price,
+                        '商家备注': note
                     });
                 });
             });
 
+            // 商家备注筛选
+            var noteFilter = document.getElementById('summaryNoteFilter');
+            if (noteFilter && noteFilter.value.trim()) {
+                var kw = noteFilter.value.trim();
+                allMergedItems = allMergedItems.filter(function(item) {
+                    return (item['商家备注'] || '').indexOf(kw) !== -1;
+                });
+            }
+
+            // 计算总金额
+            var totalAmount = 0;
+            allMergedItems.forEach(function(item) {
+                totalAmount += parseFloat(item['对应订单金额']) || 0;
+            });
+
             if (allMergedItems.length > 0) {
                 document.getElementById('summaryCount').innerText = '共 ' + allMergedItems.length + ' 条';
+                document.getElementById('summaryAmount').innerHTML = '💰 ' + totalAmount.toFixed(2);
                 document.getElementById('summaryDownloadBtn').disabled = false;
                 document.getElementById('summaryTop3Btn').disabled = false;
-                var headers = ['主订单编号', '商品属性', '购买数量', '来源平台', '对应订单金额'];
+                var headers = ['主订单编号', '商品属性', '购买数量', '来源平台', '对应订单金额', '商家备注'];
                 var sumHeadHtml = '<tr>'; headers.forEach(function(col) { sumHeadHtml += '<th>' + col + '</th>'; }); sumHeadHtml += '</tr>';
                 document.getElementById('summaryHead').innerHTML = sumHeadHtml;
                 var sumBodyHtml = '';
@@ -1603,15 +1628,16 @@
                     headers.forEach(function(col) { var val = allMergedItems[i][col] || ''; sumBodyHtml += '<td title="' + val + '">' + val + '</td>'; });
                     sumBodyHtml += '</tr>';
                 }
-                if (allMergedItems.length > 100) sumBodyHtml += '<tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:6px;">... 预览前100条，共 ' + allMergedItems.length + ' 条 ...</td></tr>';
+                if (allMergedItems.length > 100) sumBodyHtml += '<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:6px;">... 预览前100条，共 ' + allMergedItems.length + ' 条 ...</td></tr>';
                 document.getElementById('summaryBody').innerHTML = sumBodyHtml;
                 setupScrollIndicator(document.getElementById('summaryScroll'));
             } else {
                 document.getElementById('summaryCount').innerText = '共 0 条';
+                document.getElementById('summaryAmount').innerHTML = '💰 0.00';
                 document.getElementById('summaryDownloadBtn').disabled = true;
                 document.getElementById('summaryTop3Btn').disabled = true;
                 document.getElementById('summaryHead').innerHTML = '';
-                document.getElementById('summaryBody').innerHTML = '<tr><td colspan="5" class="empty-state"><span class="empty-icon">📋</span><div class="empty-title">暂无汇总数据</div><div class="empty-hint">请上传并筛选任一平台订单数据</div></td></tr>';
+                document.getElementById('summaryBody').innerHTML = '<tr><td colspan="6" class="empty-state"><span class="empty-icon">📋</span><div class="empty-title">暂无汇总数据</div><div class="empty-hint">请上传并筛选任一平台订单数据</div></td></tr>';
             }
         }
 
@@ -1672,20 +1698,35 @@
                 var map = mapRules[p.id];
                 rows.forEach(function(row) {
                     var price = getPrice(row, cfg.priceAlias);
+                    var note = '';
+                    var noteAliases = ['商家备注', '备注', '订单备注'];
+                    for (var ni = 0; ni < noteAliases.length; ni++) {
+                        if (row[noteAliases[ni]] !== undefined) { note = String(row[noteAliases[ni]] || '').trim(); break; }
+                    }
                     allMergedItems.push({
                         '主订单编号': row[map.orderId] || '',
                         '商品属性': row[map.attr] || '',
                         '购买数量': row[map.qty] || '',
                         '来源平台': map.label,
-                        '对应订单金额': price
+                        '对应订单金额': price,
+                        '商家备注': note
                     });
                 });
             });
 
+            // 商家备注筛选
+            var noteFilter = document.getElementById('summaryNoteFilter');
+            if (noteFilter && noteFilter.value.trim()) {
+                var kw = noteFilter.value.trim();
+                allMergedItems = allMergedItems.filter(function(item) {
+                    return (item['商家备注'] || '').indexOf(kw) !== -1;
+                });
+            }
+
             if (allMergedItems.length === 0) { showToast('当前无汇总数据可下载', 'warning'); return; }
 
             var dataToExport = allMergedItems;
-            var headers = ['主订单编号', '商品属性', '购买数量', '来源平台', '对应订单金额'];
+            var headers = ['主订单编号', '商品属性', '购买数量', '来源平台', '对应订单金额', '商家备注'];
             if (type === 'top3') {
                 dataToExport = allMergedItems.map(function(item) {
                     return { '主订单编号': item['主订单编号'], '商品属性': item['商品属性'], '购买数量': item['购买数量'] };
