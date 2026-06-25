@@ -1113,7 +1113,7 @@
                     '</div>' +
                     '<input type="file" id="file-' + p.id + '" data-platform="' + p.id + '" accept=".xlsx,.xls,.csv" style="display:none;" />' +
                 '</div>' +
-                '<span id="status-' + p.id + '" style="font-size:12px; color:#64748b; display:block; margin:6px 0;">等待上传...</span>' +
+                '<div style="display:flex;align-items:center;gap:6px;margin:6px 0;"><span id="status-' + p.id + '" style="font-size:12px; color:#64748b; flex:1;">等待上传...</span><button class="file-clear" style="font-size:0.85rem;padding:0 6px;" onclick="clearPlatform(\'' + p.id + '\')" title="清除文件">✕</button></div>' +
                 tipHtml +
                 '<div class="m2-filter">' +
                     '<select id="col-' + p.id + '" data-platform="' + p.id + '" onchange="applyFilter(\'' + p.id + '\')"></select>' +
