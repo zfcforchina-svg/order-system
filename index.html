@@ -1115,7 +1115,7 @@
             },
             {
                 id: 'jd', name: '京东订单', icon: '🟣', color: '#8b5cf6',
-                tip: { icon: '✂️', text: '自动去重 + 以第一个空格拆分属性' },
+                tip: { icon: '✂️', text: '按(订单号+商品)合并 + 拆分属性' },
                 config: {
                     keepCols: ['订单号', '商品属性', '订购数量', '商品名称', '商家应收', '订单状态', '付款确认时间', '商家备注'],
                     rawCols: { orderNo: '订单号', prodName: '商品名称', qty: '订购数量', price: '商家应收', status: '订单状态', payTime: '付款确认时间', memo: '商家备注' },
@@ -1237,14 +1237,52 @@
                     if (platform === 'jd') {
                         var jdCfg = PLATFORMS.find(function(x) { return x.id === 'jd'; }).config.rawCols;
                         var orderCol = jdCfg.orderNo;
-                        if (headers.indexOf(orderCol) !== -1) {
-                            var seen = new Set();
-                            finalData = finalData.filter(function(row) {
-                                var k = String(row[orderCol] || '');
-                                if (seen.has(k)) return false; seen.add(k); return true;
+                        var nameCol = jdCfg.prodName;
+                        var qtyCol = jdCfg.qty;
+                        var priceCol = jdCfg.price;
+
+                        // 京东去重第1步：按 (订单号 + 商品名称) 分组，合并数量
+                        if (headers.indexOf(orderCol) !== -1 && headers.indexOf(nameCol) !== -1) {
+                            var grouped = {};
+                            finalData.forEach(function(row) {
+                                var oNo = String(row[orderCol] || '').trim();
+                                var pName = String(row[nameCol] || '').trim();
+                                var key = oNo + '|||' + pName;
+                                if (!grouped[key]) {
+                                    grouped[key] = Object.assign({}, row);
+                                } else {
+                                    var existQty = parseFloat(grouped[key][qtyCol]) || 0;
+                                    var newQty = parseFloat(row[qtyCol]) || 0;
+                                    grouped[key][qtyCol] = existQty + newQty;
+                                }
+                            });
+                            finalData = Object.values(grouped);
+                        }
+
+                        // 京东去重第2步：同订单号下重复的订单总金额置0
+                        if (headers.indexOf(orderCol) !== -1 && priceCol && headers.indexOf(priceCol) !== -1) {
+                            var orderGroups = {};
+                            finalData.forEach(function(row) {
+                                var oNo = String(row[orderCol] || '').trim();
+                                if (!orderGroups[oNo]) orderGroups[oNo] = [];
+                                orderGroups[oNo].push(row);
+                            });
+                            Object.keys(orderGroups).forEach(function(oNo) {
+                                var rows = orderGroups[oNo];
+                                if (rows.length <= 1) return;
+                                var firstPrice = parseFloat(rows[0][priceCol]) || 0;
+                                var allSame = rows.every(function(r) {
+                                    return (parseFloat(r[priceCol]) || 0) === firstPrice;
+                                });
+                                if (allSame && firstPrice !== 0) {
+                                    for (var r = 1; r < rows.length; r++) {
+                                        rows[r][priceCol] = 0;
+                                    }
+                                }
                             });
                         }
-                        var nameCol = jdCfg.prodName;
+
+                        // 拆分商品名称：第一个空格前为商品名，后为SKU属性
                         if (headers.indexOf(nameCol) !== -1) {
                             finalData = finalData.map(function(row) {
                                 var fullName = String(row[nameCol] || '');
