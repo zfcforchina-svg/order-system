@@ -1535,7 +1535,18 @@
             jd: { orderId: '订单号', attr: '商品属性', qty: '订购数量', label: '京东' }
         };
 
-        function updateSummary() {
+        function getPrice(row, aliases) {
+            for (var i = 0; i < aliases.length; i++) {
+                var val = row[aliases[i]];
+                if (val !== undefined && val !== null && val !== '') return val;
+            }
+            return '';
+        }
+
+        // ==========================================================
+        // Update summary table
+        // ==========================================================
+ {
             var allMergedItems = [];
             var mapRulesLocal = {
                 tmallA: { orderId: '主订单编号', attr: '商品属性', qty: '购买数量', label: '天猫A' },
